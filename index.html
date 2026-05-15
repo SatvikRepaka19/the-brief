@@ -1,0 +1,1555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Brief — Morning Market Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+:root {
+  --bg:      #0a0a0f;
+  --bg2:     #111118;
+  --bg3:     #16161f;
+  --border:  #1e1e2e;
+  --border2: #2a2a3a;
+  --accent:  #e8c97a;
+  --accent2: #4ecdc4;
+  --text:    #e8e8f0;
+  --text2:   #9090a8;
+  --text3:   #5a5a70;
+  --green:   #4ecdc4;
+  --red:     #ff6b6b;
+  --orange:  #ff9f43;
+}
+*,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: 'IBM Plex Sans', sans-serif;
+       font-size: 14px; line-height: 1.5; min-height: 100vh; }
+button { cursor: pointer; }
+a { color: var(--accent); text-decoration: none; }
+
+/* ── Loading ── */
+#loading { position: fixed; inset: 0; background: var(--bg); display: flex;
+           flex-direction: column; align-items: center; justify-content: center; z-index: 999; }
+.spinner { width: 36px; height: 36px; border: 3px solid var(--border2);
+           border-top-color: var(--accent); border-radius: 50%;
+           animation: spin .8s linear infinite; margin-bottom: 16px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-family: 'IBM Plex Mono', monospace; color: var(--text2); font-size: 13px; }
+
+/* ── App shell ── */
+#app { display: none; flex-direction: column; min-height: 100vh; }
+.container { max-width: 1420px; margin: 0 auto; padding: 0 24px; }
+
+/* ── Header ── */
+header { border-bottom: 1px solid var(--border); padding: 18px 0; }
+header .container { display: flex; justify-content: space-between; align-items: center; }
+.hdr-left { display: flex; flex-direction: column; gap: 3px; }
+.hdr-logo { font-family: Georgia, 'Times New Roman', serif; font-size: 26px;
+            font-weight: 700; color: var(--accent); letter-spacing: 3px; }
+.hdr-sub  { font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+            letter-spacing: 4px; color: var(--accent); opacity: .7; text-transform: uppercase; }
+.hdr-right { text-align: right; }
+.hdr-date   { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--text); }
+.hdr-source { font-size: 11px; color: var(--text3); margin-top: 2px; }
+
+/* ── Ticker bar ── */
+.ticker-wrap { background: var(--bg2); border-bottom: 1px solid var(--border);
+               overflow: hidden; height: 36px; display: flex; align-items: center; }
+.ticker-inner { display: inline-flex; animation: marquee 45s linear infinite; white-space: nowrap; }
+.ticker-inner:hover { animation-play-state: paused; }
+@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.tick-item { display: inline-flex; align-items: center; gap: 8px;
+             padding: 0 24px; border-right: 1px solid var(--border); height: 36px; }
+.tick-sym  { font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+             font-weight: 500; color: var(--text); }
+.tick-price { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--text2); }
+.tick-chg   { font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 500; }
+.up   { color: var(--green); }
+.down { color: var(--red);   }
+
+/* ── Tab nav ── */
+.tab-nav { border-bottom: 1px solid var(--border); position: sticky; top: 0;
+           background: var(--bg); z-index: 10; }
+.tab-nav .container { display: flex; gap: 0; }
+.tab-btn { background: none; border: none; border-bottom: 2px solid transparent;
+           color: var(--text2); font-family: 'IBM Plex Sans', sans-serif; font-size: 13px;
+           font-weight: 500; padding: 14px 20px; transition: color .2s, border-color .2s;
+           margin-bottom: -1px; white-space: nowrap; }
+.tab-btn:hover   { color: var(--text); }
+.tab-btn.active  { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ── Tab panels ── */
+.tab-panel { padding: 32px 0 60px; }
+
+/* ── Section headers ── */
+.section { margin-bottom: 40px; }
+.section-label { font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+                 color: var(--accent); letter-spacing: 3px; text-transform: uppercase;
+                 margin-bottom: 4px; }
+.section-title { font-size: 18px; font-weight: 600; color: var(--text); margin-bottom: 16px; }
+
+/* ── Chart boxes ── */
+.chart-box { background: var(--bg2); border: 1px solid var(--border);
+             border-radius: 8px; padding: 16px; }
+.chart-header { display: flex; justify-content: space-between; align-items: center;
+                margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+.chart-title { font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+               font-weight: 500; color: var(--text2); text-transform: uppercase;
+               letter-spacing: 1px; }
+.chart-body  { width: 100%; }
+
+/* ── Grids ── */
+.grid-2  { display: grid; grid-template-columns: repeat(2,1fr); gap: 20px; }
+.grid-3  { display: grid; grid-template-columns: repeat(3,1fr); gap: 20px; }
+.grid-4  { display: grid; grid-template-columns: repeat(4,1fr); gap: 20px; }
+.grid-22 { display: grid; grid-template-columns: repeat(2,1fr); gap: 20px; }
+.gap-sm  { gap: 12px; }
+
+/* ── Stat cards ── */
+.stat-card { background: var(--bg3); border: 1px solid var(--border);
+             border-radius: 8px; padding: 16px; }
+.stat-label  { font-size: 11px; color: var(--text3); text-transform: uppercase;
+               letter-spacing: 1px; margin-bottom: 6px; }
+.stat-value  { font-family: 'IBM Plex Mono', monospace; font-size: 22px;
+               font-weight: 500; color: var(--text); line-height: 1.2; }
+.stat-change { font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+               margin-top: 4px; display: flex; align-items: center; gap: 4px; }
+.stat-arrow  { font-size: 10px; }
+.stat-meta   { font-size: 11px; color: var(--text3); margin-top: 4px; }
+
+/* ── Period toggles ── */
+.toggle-group { display: flex; gap: 4px; flex-wrap: wrap; }
+.toggle-btn { background: none; border: 1px solid var(--border2); border-radius: 4px;
+              color: var(--text3); font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+              padding: 3px 8px; transition: all .15s; }
+.toggle-btn:hover  { border-color: var(--text2); color: var(--text2); }
+.toggle-btn.active { border-color: var(--accent); color: var(--accent); }
+
+/* ── Data tables ── */
+.data-table { width: 100%; border-collapse: collapse; font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+.data-table th { color: var(--text3); font-weight: 500; text-align: left;
+                 padding: 8px 10px; border-bottom: 1px solid var(--border);
+                 font-size: 10px; text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; }
+.data-table td { padding: 9px 10px; border-bottom: 1px solid var(--border); color: var(--text); white-space: nowrap; }
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tr:hover td { background: var(--bg3); }
+.td-right { text-align: right; }
+.td-center { text-align: center; }
+
+/* ── Guide tab ── */
+.guide-intro { max-width: 780px; margin-bottom: 32px; line-height: 1.75; color: var(--text2); font-size: 14px; }
+.guide-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; margin-bottom: 40px; }
+.guide-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+.guide-card-title { font-weight: 600; color: var(--accent); margin-bottom: 8px; font-size: 13px; }
+.guide-card-body  { color: var(--text2); font-size: 13px; line-height: 1.6; }
+
+/* ── FOMC list ── */
+.fomc-year { font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+             color: var(--accent); letter-spacing: 2px; margin: 20px 0 8px;
+             text-transform: uppercase; }
+.fomc-item { display: flex; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--border);
+             align-items: center; font-size: 13px; }
+.fomc-dot  { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: 2px; }
+.fomc-past .fomc-dot   { background: var(--text3); }
+.fomc-future .fomc-dot { background: var(--accent2); }
+.fomc-date     { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--text2); min-width: 100px; }
+.fomc-outcome  { color: var(--text2); font-size: 13px; }
+.fomc-days     { font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+                 color: var(--accent2); margin-left: auto; white-space: nowrap; }
+.fomc-past .fomc-outcome { text-decoration: line-through; color: var(--text3); }
+.fomc-check { color: var(--green); margin-right: 6px; }
+
+/* ── Release calendar ── */
+.rel-row { display: flex; gap: 20px; padding: 7px 0; border-bottom: 1px solid var(--border);
+           font-size: 13px; align-items: center; }
+.rel-date  { font-family: 'IBM Plex Mono', monospace; font-size: 12px; min-width: 90px; color: var(--text2); }
+.rel-name  { flex: 1; }
+.rel-today { background: rgba(232,201,122,.06); border-radius: 4px; }
+.rel-today .rel-date { color: var(--accent); }
+.rel-past  { opacity: .45; }
+.rel-badge { font-size: 10px; padding: 2px 6px; border-radius: 3px; font-family: 'IBM Plex Mono', monospace; }
+.badge-inflation { background: rgba(255,107,107,.15); color: var(--red); }
+.badge-growth    { background: rgba(78,205,196,.15); color: var(--green); }
+.badge-labor     { background: rgba(255,159,67,.15); color: var(--orange); }
+.badge-fomc      { background: rgba(232,201,122,.15); color: var(--accent); }
+
+/* ── No-data placeholder ── */
+.no-data { display: flex; align-items: center; justify-content: center;
+           height: 100%; color: var(--text3); font-family: 'IBM Plex Mono', monospace;
+           font-size: 12px; font-style: italic; padding: 40px; }
+
+/* ── Summary sentence ── */
+.curve-summary { font-size: 13px; color: var(--text2); padding: 10px 14px;
+                 background: var(--bg3); border-radius: 6px; border-left: 3px solid var(--accent);
+                 margin-bottom: 16px; line-height: 1.5; }
+
+/* ── Regime label ── */
+.regime-badge { display: inline-block; padding: 4px 14px; border-radius: 20px;
+                font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 500;
+                letter-spacing: 1px; margin-bottom: 8px; }
+
+/* ── Responsive ── */
+@media (max-width: 960px) {
+  .grid-2,.grid-3,.grid-4,.guide-grid,.grid-22 { grid-template-columns: 1fr; }
+  .tab-btn { padding: 12px 14px; font-size: 12px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading">
+  <div class="spinner"></div>
+  <p class="loading-text">Loading market data…</p>
+</div>
+
+<!-- App -->
+<div id="app">
+
+  <!-- Header -->
+  <header>
+    <div class="container">
+      <div class="hdr-left">
+        <div class="hdr-logo">◆ THE BRIEF</div>
+        <div class="hdr-sub">Morning Market Intelligence</div>
+      </div>
+      <div class="hdr-right">
+        <div class="hdr-date" id="hdr-date">—</div>
+        <div class="hdr-source">Source: FRED / Yahoo Finance</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Ticker bar -->
+  <div class="ticker-wrap">
+    <div class="ticker-inner" id="ticker-inner">Loading…</div>
+  </div>
+
+  <!-- Tab nav -->
+  <nav class="tab-nav">
+    <div class="container">
+      <button class="tab-btn active" data-tab="guide">Guide &amp; Analysis</button>
+      <button class="tab-btn" data-tab="equities">Equities</button>
+      <button class="tab-btn" data-tab="fi">Fixed Income &amp; Macro</button>
+      <button class="tab-btn" data-tab="calendar">Calendar</button>
+    </div>
+  </nav>
+
+  <!-- Tab panels -->
+  <main>
+
+    <!-- ══ GUIDE ══ -->
+    <section id="tab-guide" class="tab-panel">
+      <div class="container">
+        <div class="section-label">Overview</div>
+        <h1 class="section-title" style="font-size:24px; margin-bottom:12px">The Brief</h1>
+        <p class="guide-intro">
+          A personal daily macro market intelligence dashboard. Python fetches data from FRED and
+          Yahoo Finance, computes analytics, and writes <code style="color:var(--accent)">data.json</code>.
+          This page reads that file and renders interactive Plotly charts. Refresh after running
+          <code style="color:var(--accent)">python generate.py</code> to update all data.
+        </p>
+
+        <div class="section-label">How to Read</div>
+        <div class="guide-grid">
+          <div class="guide-card">
+            <div class="guide-card-title">Regime Score (0–100)</div>
+            <div class="guide-card-body">Combines 5 signals into a Fear/Greed gauge. Each component contributes 0–20 pts. Scores 0–25 = Extreme Fear (sell everything), 46–55 = Neutral, 76–100 = Extreme Greed (be cautious). Based on rolling percentile rank of each signal.</div>
+          </div>
+          <div class="guide-card">
+            <div class="guide-card-title">Composite Score</div>
+            <div class="guide-card-body">Per-sector ETF composite = average of Return Z-score and Volume Z-score, clipped to ±3. Positive = recent outperformance + above-average volume (accumulation). Negative = underperformance + below-average volume (distribution).</div>
+          </div>
+          <div class="guide-card">
+            <div class="guide-card-title">Flow Z-Score</div>
+            <div class="guide-card-body">Rolling z-score of an ETF's daily volume vs its own 1-year history. Positive = above-average trading volume (attention/accumulation). Negative = below-average (quiet/distribution). Clipped to ±3.</div>
+          </div>
+          <div class="guide-card">
+            <div class="guide-card-title">Breadth (RSP/SPY)</div>
+            <div class="guide-card-body">Equal-weight vs cap-weight ratio. Rising = broader market participation (healthy bull). Falling = narrow leadership (fragile, often large-cap driven). Indexed to 1.0 at start of data window.</div>
+          </div>
+          <div class="guide-card">
+            <div class="guide-card-title">Cyc / Def Ratio</div>
+            <div class="guide-card-body">Equal-weight cyclical (XLK, XLF, XLY, XLI, XLB) divided by defensive (XLP, XLU, XLV). Rising = risk-on, markets pricing growth. Falling = risk-off, markets rotating to safety. A leading indicator for macro regime.</div>
+          </div>
+          <div class="guide-card">
+            <div class="guide-card-title">OAS Spreads</div>
+            <div class="guide-card-body">Option-Adjusted Spread = yield premium over Treasuries. HY OAS &gt;500bps = elevated stress. IG OAS &gt;200bps = caution. Wider spreads = higher perceived default risk = risk-off signal across all assets.</div>
+          </div>
+          <div class="guide-card">
+            <div class="guide-card-title">Breakeven Inflation</div>
+            <div class="guide-card-body">10Y Treasury yield minus 10Y TIPS yield. Market's 10-year inflation expectation. &gt;3% = markets fear inflation. &lt;1.5% = deflation fears. Fed targets ~2%. Rising breakevens with rising yields = stagflation concern.</div>
+          </div>
+          <div class="guide-card">
+            <div class="guide-card-title">Rolling Alpha</div>
+            <div class="guide-card-body">126-day compounded return of factor ETF minus SPY over same period. Positive = factor outperformed market. Negative = underperformed. Helps identify which investment style is working in the current regime.</div>
+          </div>
+          <div class="guide-card">
+            <div class="guide-card-title">Copper / Gold Ratio</div>
+            <div class="guide-card-body">Rising = copper (industrial) outperforming gold (safe haven) = growth expectations improving. Falling = gold outperforming = defensive positioning, growth fears, or geopolitical stress. Classic macro regime indicator.</div>
+          </div>
+        </div>
+
+        <div class="section-label">Glossary</div>
+        <div class="chart-box" style="overflow-x:auto">
+          <table class="data-table">
+            <thead><tr><th>Term</th><th>Definition</th><th>Bullish / Bearish Signal</th></tr></thead>
+            <tbody>
+              <tr><td>Macro/Micro Dispersion</td><td>Cross-sector std dev / (cross-sector + within-sector vol). Rolling 252d percentile.</td><td>&gt;0.75 = macro-driven. &lt;0.25 = stock-picking market.</td></tr>
+              <tr><td>Drawdown</td><td>Current price vs rolling all-time high in window: (price/cummax − 1) × 100%</td><td>Lower drawdown = stronger uptrend. Deep DD = downtrend / recovery phase.</td></tr>
+              <tr><td>10Y-2Y Spread</td><td>Difference between 10-year and 2-year Treasury yields in percentage points</td><td>Positive = normal curve. Negative (inverted) = recession signal.</td></tr>
+              <tr><td>Real Yield</td><td>10Y Treasury yield minus inflation expectations (TIPS yield)</td><td>High real yields hurt stocks. Negative real yields = stimulative environment.</td></tr>
+              <tr><td>52W High Proximity</td><td>How close current price is to 52-week high as % of the low-to-high range (0–100)</td><td>&gt;70% = near highs (momentum). &lt;30% = near lows (potential value or deterioration).</td></tr>
+              <tr><td>Z-Score</td><td>Standard deviations from rolling mean: (x − μ) / σ, clipped to ±3</td><td>+2 = unusually high. −2 = unusually low. Near 0 = average.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ EQUITIES ══ -->
+    <section id="tab-equities" class="tab-panel" style="display:none">
+      <div class="container">
+
+        <!-- 2.1 Regime -->
+        <div class="section">
+          <div class="section-label">2.1</div>
+          <div class="section-title">Market Regime</div>
+          <div class="grid-2" style="align-items:start">
+            <div class="chart-box">
+              <div class="chart-header"><span class="chart-title">Fear / Greed Gauge</span></div>
+              <div id="regime-gauge" class="chart-body" style="height:260px"></div>
+              <div id="regime-badge" style="text-align:center;padding-bottom:8px"></div>
+            </div>
+            <div class="chart-box">
+              <div class="chart-header"><span class="chart-title">Component Breakdown (0–20 each)</span></div>
+              <div id="regime-bars" class="chart-body" style="height:280px"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2.2 Indices -->
+        <div class="section">
+          <div class="section-label">2.2</div>
+          <div class="section-title">U.S. Major Indices — Cumulative Return</div>
+          <div class="chart-box">
+            <div class="chart-header">
+              <span class="chart-title">SPY · QQQ · IWM · DIA</span>
+              <div class="toggle-group" id="idx-toggle"></div>
+            </div>
+            <div id="idx-chart" class="chart-body" style="height:320px"></div>
+          </div>
+        </div>
+
+        <!-- 2.3 Commodities -->
+        <div class="section">
+          <div class="section-label">2.3</div>
+          <div class="section-title">Commodities &amp; Dollar</div>
+          <div class="grid-4 gap-sm" id="commodity-cards" style="margin-bottom:20px"></div>
+          <div class="chart-box">
+            <div class="chart-header"><span class="chart-title">Copper / Gold Ratio</span></div>
+            <div id="cg-ratio-chart" class="chart-body" style="height:220px"></div>
+          </div>
+        </div>
+
+        <!-- 2.4 Sector Table -->
+        <div class="section">
+          <div class="section-label">2.4</div>
+          <div class="section-title">Sector Positioning by Composite</div>
+          <div class="grid-2" style="align-items:start">
+            <div class="chart-box">
+              <div class="chart-title" style="margin-bottom:12px">▲ Top 3 — Accumulation</div>
+              <div id="top3-table"></div>
+            </div>
+            <div class="chart-box">
+              <div class="chart-title" style="margin-bottom:12px">▼ Bottom 3 — Distribution</div>
+              <div id="bot3-table"></div>
+            </div>
+          </div>
+          <div class="chart-box" style="margin-top:20px; overflow-x:auto">
+            <div class="chart-title" style="margin-bottom:12px">All Sectors</div>
+            <div id="sector-table"></div>
+          </div>
+        </div>
+
+        <!-- 2.5 52-week -->
+        <div class="section">
+          <div class="section-label">2.5</div>
+          <div class="section-title">52-Week High / Low Proximity</div>
+          <div class="chart-box">
+            <div id="fiftytwo-chart" class="chart-body" style="height:340px"></div>
+          </div>
+        </div>
+
+        <!-- 2.6 Positioning Feed -->
+        <div class="section">
+          <div class="section-label">2.6</div>
+          <div class="section-title">Daily Positioning Feed</div>
+          <div class="grid-2 gap-sm">
+            <div class="chart-box">
+              <div class="chart-header"><span class="chart-title">Macro vs Micro Dispersion</span></div>
+              <div id="mm-chart" class="chart-body" style="height:220px"></div>
+            </div>
+            <div class="chart-box">
+              <div class="chart-header"><span class="chart-title">Breadth — RSP / SPY</span></div>
+              <div id="breadth-chart" class="chart-body" style="height:220px"></div>
+            </div>
+            <div class="chart-box">
+              <div class="chart-header"><span class="chart-title">Cyclical / Defensive Ratio</span></div>
+              <div id="cycdef-chart" class="chart-body" style="height:220px"></div>
+            </div>
+            <div class="chart-box">
+              <div class="chart-header"><span class="chart-title">SPY Volume Z-Score</span></div>
+              <div id="volz-chart" class="chart-body" style="height:220px"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2.7 Drawdown -->
+        <div class="section">
+          <div class="section-label">2.7</div>
+          <div class="section-title">Drawdown from Peak</div>
+          <div class="chart-box">
+            <div class="chart-header">
+              <span class="chart-title">SPY + All Sector ETFs</span>
+              <div class="toggle-group" id="dd-toggle"></div>
+            </div>
+            <div id="dd-chart" class="chart-body" style="height:360px"></div>
+          </div>
+        </div>
+
+        <!-- 2.8 Correlation -->
+        <div class="section">
+          <div class="section-label">2.8</div>
+          <div class="section-title">Rolling 60-Day Sector Correlation</div>
+          <div class="chart-box">
+            <div id="corr-chart" class="chart-body" style="height:420px"></div>
+          </div>
+        </div>
+
+        <!-- 2.9 Relative Perf -->
+        <div class="section">
+          <div class="section-label">2.9</div>
+          <div class="section-title">Relative Performance</div>
+          <div class="grid-2 gap-sm">
+            <div class="chart-box">
+              <div class="chart-header">
+                <span class="chart-title">Factor ETFs vs SPY</span>
+                <div class="toggle-group" id="frel-toggle"></div>
+              </div>
+              <div id="frel-chart" class="chart-body" style="height:280px"></div>
+            </div>
+            <div class="chart-box">
+              <div class="chart-header"><span class="chart-title">Factor Rolling 6M Alpha vs SPY</span></div>
+              <div id="falpha-chart" class="chart-body" style="height:280px"></div>
+            </div>
+            <div class="chart-box">
+              <div class="chart-header">
+                <span class="chart-title">Cyclical Sectors vs SPY</span>
+                <div class="toggle-group" id="crel-toggle"></div>
+              </div>
+              <div id="crel-chart" class="chart-body" style="height:280px"></div>
+            </div>
+            <div class="chart-box">
+              <div class="chart-header">
+                <span class="chart-title">Defensive Sectors vs SPY</span>
+                <div class="toggle-group" id="drel-toggle"></div>
+              </div>
+              <div id="drel-chart" class="chart-body" style="height:280px"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2.10 ETF Flow -->
+        <div class="section">
+          <div class="section-label">2.10</div>
+          <div class="section-title">Individual ETF Flow &amp; Price</div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:12px;font-family:'IBM Plex Mono',monospace">
+            Return % (left) + Volume Z-Score bars (right) · Green = accumulation · Red = distribution
+          </div>
+          <div class="chart-title" style="margin-bottom:10px">SECTOR ETFs</div>
+          <div class="grid-2 gap-sm" id="fp-sector-grid" style="margin-bottom:20px"></div>
+          <div class="chart-title" style="margin-bottom:10px">FACTOR ETFs</div>
+          <div class="grid-2 gap-sm" id="fp-factor-grid"></div>
+        </div>
+
+        <!-- 2.11 Heatmap + Bar -->
+        <div class="section">
+          <div class="section-label">2.11</div>
+          <div class="section-title">Sector Return Heatmap &amp; Sorted Bar</div>
+          <div class="grid-2 gap-sm">
+            <div class="chart-box">
+              <div class="chart-header"><span class="chart-title">Return Heatmap (1M / 5D)</span></div>
+              <div id="ret-heatmap" class="chart-body" style="height:200px"></div>
+            </div>
+            <div class="chart-box">
+              <div class="chart-header"><span class="chart-title">1M Returns — Sorted</span></div>
+              <div id="ret-bar" class="chart-body" style="height:200px"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2.12 Candlestick -->
+        <div class="section">
+          <div class="section-label">2.12</div>
+          <div class="section-title">SPY Candlestick + 20-Day MA</div>
+          <div class="chart-box">
+            <div class="chart-header">
+              <span class="chart-title">SPY OHLCV</span>
+              <div class="toggle-group" id="candle-toggle"></div>
+            </div>
+            <div id="candle-chart" class="chart-body" style="height:360px"></div>
+          </div>
+        </div>
+
+      </div><!-- /container -->
+    </section>
+
+    <!-- ══ FIXED INCOME ══ -->
+    <section id="tab-fi" class="tab-panel" style="display:none">
+      <div class="container">
+
+        <!-- 3.1 Key Rates -->
+        <div class="section">
+          <div class="section-label">3.1</div>
+          <div class="section-title">Key Rates Snapshot</div>
+          <div id="key-rates-cards" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px"></div>
+          <div class="curve-summary" id="curve-summary">—</div>
+        </div>
+
+        <!-- 3.2 Yield Curve -->
+        <div class="section">
+          <div class="section-label">3.2</div>
+          <div class="section-title">Yield Curve</div>
+          <div class="grid-2 gap-sm">
+            <div class="chart-box">
+              <div class="chart-header"><span class="chart-title">Spot Rates (1M → 30Y)</span></div>
+              <div id="yc-spot" class="chart-body" style="height:280px"></div>
+            </div>
+            <div class="chart-box">
+              <div class="chart-header">
+                <span class="chart-title">Treasury Yields Over Time</span>
+                <div class="toggle-group" id="yh-toggle"></div>
+              </div>
+              <div id="yc-hist" class="chart-body" style="height:280px"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3.3 Spreads -->
+        <div class="section">
+          <div class="section-label">3.3</div>
+          <div class="section-title">Curve Spreads</div>
+          <div class="chart-box">
+            <div class="chart-header">
+              <span class="chart-title">10Y-2Y · 10Y-3M — Red dashed = Zero</span>
+              <div class="toggle-group" id="cs-toggle"></div>
+            </div>
+            <div id="spreads-chart" class="chart-body" style="height:300px"></div>
+          </div>
+        </div>
+
+        <!-- 3.4 Real Yield -->
+        <div class="section">
+          <div class="section-label">3.4</div>
+          <div class="section-title">Real Yield &amp; Breakeven Inflation</div>
+          <div class="chart-box">
+            <div id="ry-chart" class="chart-body" style="height:280px"></div>
+          </div>
+        </div>
+
+        <!-- 3.5 Credit Spreads -->
+        <div class="section">
+          <div class="section-label">3.5</div>
+          <div class="section-title">Credit Spreads (OAS)</div>
+          <div class="chart-box">
+            <div class="chart-header"><span class="chart-title">HY OAS · IG OAS · HY-IG Gap — Wider = risk-off</span></div>
+            <div id="credit-chart" class="chart-body" style="height:280px"></div>
+          </div>
+        </div>
+
+        <!-- 3.6 Inflation Decomp -->
+        <div class="section">
+          <div class="section-label">3.6</div>
+          <div class="section-title">CPI Component Breakdown YoY %</div>
+          <div class="chart-box">
+            <div class="chart-header"><span class="chart-title">Shelter · Food · Core Goods · Services + 2% Target</span></div>
+            <div id="infl-decomp" class="chart-body" style="height:300px"></div>
+          </div>
+        </div>
+
+        <!-- 3.7 Macro Charts -->
+        <div class="section">
+          <div class="section-label">3.7</div>
+          <div class="section-title">Macro Charts</div>
+          <div class="grid-2 gap-sm">
+            <div class="chart-box">
+              <div class="chart-header"><span class="chart-title">CPI &amp; Core CPI YoY</span></div>
+              <div id="cpi-chart" class="chart-body" style="height:240px"></div>
+            </div>
+            <div class="chart-box">
+              <div class="chart-header"><span class="chart-title">PCE &amp; Core PCE YoY</span></div>
+              <div id="pce-chart" class="chart-body" style="height:240px"></div>
+            </div>
+            <div class="chart-box">
+              <div class="chart-header"><span class="chart-title">Fed Funds &amp; Unemployment (Dual Mandate)</span></div>
+              <div id="fedfunds-chart" class="chart-body" style="height:240px"></div>
+            </div>
+            <div class="chart-box">
+              <div class="chart-header"><span class="chart-title">Real GDP Growth QoQ Annualized</span></div>
+              <div id="gdp-chart" class="chart-body" style="height:240px"></div>
+            </div>
+            <div class="chart-box" style="grid-column:1/-1">
+              <div class="chart-header"><span class="chart-title">Macro Pulse — 10Y-2Y · Fed Funds · Unemployment</span></div>
+              <div id="pulse-chart" class="chart-body" style="height:260px"></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ══ CALENDAR ══ -->
+    <section id="tab-calendar" class="tab-panel" style="display:none">
+      <div class="container">
+
+        <!-- 4.1 Releases Table -->
+        <div class="section">
+          <div class="section-label">4.1</div>
+          <div class="section-title">Key Releases — Latest vs Previous</div>
+          <div class="chart-box" style="overflow-x:auto"><div id="releases-table"></div></div>
+        </div>
+
+        <!-- 4.2 Release Calendar -->
+        <div class="section">
+          <div class="section-label">4.2</div>
+          <div class="section-title">Economic Release Calendar</div>
+          <div class="chart-box"><div id="release-calendar"></div></div>
+        </div>
+
+        <!-- 4.3 FOMC -->
+        <div class="section">
+          <div class="section-label">4.3</div>
+          <div class="section-title">FOMC Meeting Dates</div>
+          <div class="chart-box"><div id="fomc-list"></div></div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+</div><!-- /app -->
+
+<script>
+'use strict';
+
+// ── Global state ──────────────────────────────────────────────────────────────
+let D = null;
+const done = {};
+
+// ── Colors ────────────────────────────────────────────────────────────────────
+const C = {
+  bg:'#0a0a0f', bg2:'#111118', bg3:'#16161f',
+  border:'#1e1e2e', border2:'#2a2a3a',
+  accent:'#e8c97a', accent2:'#4ecdc4',
+  text:'#e8e8f0', text2:'#9090a8', text3:'#5a5a70',
+  green:'#4ecdc4', red:'#ff6b6b', orange:'#ff9f43',
+  blues:['#4d9de0','#e15554','#3bb273','#e8c97a','#ab87ff','#ff9f43'],
+  sectors:['#4d9de0','#e15554','#3bb273','#e8c97a','#ab87ff',
+           '#ff9f43','#4ecdc4','#f7a072','#52b788','#c77dff','#e8c97a'],
+};
+
+// Factor colors
+const FCOLS = {USMV:'#9090a8',MTUM:'#4d9de0',VLUE:'#e15554',QUAL:'#3bb273',HDV:'#e8c97a',SIZE:'#ff9f43'};
+const SECTOR_ETFS = ['XLK','XLF','XLE','XLV','XLI','XLU','XLP','XLY','XLB','XLRE','XLC'];
+
+// ── Plotly base ───────────────────────────────────────────────────────────────
+const PL = {
+  paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'#111118',
+  font:{family:'IBM Plex Mono',color:'#9090a8',size:11},
+  xaxis:{gridcolor:'#1e1e2e',zerolinecolor:'#2a2a3a',linecolor:'#1e1e2e'},
+  yaxis:{gridcolor:'#1e1e2e',zerolinecolor:'#2a2a3a',linecolor:'#1e1e2e'},
+  margin:{t:30,r:20,b:40,l:55},
+  showlegend:true,
+  legend:{bgcolor:'rgba(0,0,0,0)',font:{size:10}},
+};
+const CFG = {responsive:true,displayModeBar:false};
+
+function pl(o={}) {
+  return Object.assign({},PL,o,{
+    xaxis:Object.assign({},PL.xaxis,o.xaxis||{}),
+    yaxis:Object.assign({},PL.yaxis,o.yaxis||{}),
+  });
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const fmt  = (v,d=2) => v==null?'—':(+v).toFixed(d);
+const fmtP = (v,d=2) => v==null?'—':(v>=0?'+':'')+fmt(v,d)+'%';
+const clr  = v => v==null?C.text2:v>=0?C.green:C.red;
+const sign  = v => v==null?'':v>=0?'↑':'↓';
+
+function el(id){ return document.getElementById(id); }
+function noData(id, msg='Data unavailable'){
+  const e=el(id); if(e) e.innerHTML=`<div class="no-data">${msg}</div>`;
+}
+function safePlot(id,traces,layout,cfg=CFG){
+  try{ Plotly.newPlot(id,traces,layout,cfg); }
+  catch(e){ noData(id,'Chart error: '+e.message); }
+}
+
+// Period cutoff
+function cutoffDate(p){
+  const now=new Date();
+  const d=(days)=>{ const d=new Date(now); d.setDate(d.getDate()-days); return d.toISOString().slice(0,10); };
+  if(p==='1M')  return d(30);
+  if(p==='3M')  return d(90);
+  if(p==='6M')  return d(183);
+  if(p==='YTD') return new Date(now.getFullYear(),0,1).toISOString().slice(0,10);
+  if(p==='1Y')  return d(365);
+  if(p==='3Y')  return d(1095);
+  if(p==='5Y')  return d(1825);
+  if(p==='10Y') return d(3650);
+  return null; // Full
+}
+
+// Slice a {dates, values} pair by period
+function slicePeriod(dates, values, period){
+  const co=cutoffDate(period);
+  if(!co) return {dates,values};
+  const k=dates.findIndex(d=>d>=co);
+  if(k<0) return {dates,values};
+  return {dates:dates.slice(k), values:values.slice(k)};
+}
+
+// Slice and rebase cumulative return series (cumPct%) to new start=0
+function sliceRebase(dates, cumPct, period){
+  const co=cutoffDate(period);
+  if(!co) return {dates,values:cumPct};
+  const k=dates.findIndex(d=>d>=co);
+  if(k<0) return {dates,values:cumPct};
+  const base=cumPct[k];
+  return {
+    dates:dates.slice(k),
+    values:cumPct.slice(k).map(v=>
+      (v!=null&&base!=null) ? ((1+v/100)/(1+base/100)-1)*100 : null
+    )
+  };
+}
+
+// Slice and re-index a ratio series to 1.0 at cutoff
+function sliceRatio(dates, seriesObj, period){
+  const co=cutoffDate(period);
+  if(!co) return {dates,series:seriesObj};
+  const k=dates.findIndex(d=>d>=co);
+  if(k<0) return {dates,series:seriesObj};
+  const newDates=dates.slice(k);
+  const newSeries={};
+  for(const [t,vals] of Object.entries(seriesObj)){
+    const base=vals[k]; if(base==null||base===0){ newSeries[t]=vals.slice(k); continue; }
+    newSeries[t]=vals.slice(k).map(v=>v!=null?v/base:null);
+  }
+  return {dates:newDates,series:newSeries};
+}
+
+// Make period toggle buttons
+function makeToggle(cid, opts, def, cb){
+  const e=el(cid); if(!e) return;
+  e.innerHTML=opts.map(o=>
+    `<button class="toggle-btn${o===def?' active':''}" data-period="${o}">${o}</button>`
+  ).join('');
+  e.addEventListener('click',ev=>{
+    const btn=ev.target.closest('.toggle-btn'); if(!btn) return;
+    e.querySelectorAll('.toggle-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    cb(btn.dataset.period);
+  });
+}
+
+// Sector table rows HTML
+function sectorRow(r, highlight=false){
+  const bg=highlight?`background:var(--bg3);`:'';
+  return `<tr style="${bg}">
+    <td><span style="font-family:'IBM Plex Mono',monospace;font-weight:500">${r.ticker}</span></td>
+    <td>${r.name}</td>
+    <td class="td-right" style="color:${clr(r['1D'])}">${fmtP(r['1D'],2)}</td>
+    <td class="td-right" style="color:${clr(r['5D'])}">${fmtP(r['5D'],2)}</td>
+    <td class="td-right" style="color:${clr(r['1M'])}">${fmtP(r['1M'],2)}</td>
+    <td class="td-right" style="color:${clr(r['12M'])}">${fmtP(r['12M'],2)}</td>
+    <td class="td-right" style="color:${clr(r.return_z)}">${fmt(r.return_z)}</td>
+    <td class="td-right" style="color:${clr(r.volume_z)}">${fmt(r.volume_z)}</td>
+    <td class="td-right" style="font-weight:600;color:${clr(r.composite)}">${fmt(r.composite)}</td>
+  </tr>`;
+}
+function sectorTable(rows, highlight=false){
+  return `<table class="data-table">
+    <thead><tr><th>Ticker</th><th>Name</th><th class="td-right">1D</th><th class="td-right">5D</th><th class="td-right">1M</th><th class="td-right">12M</th><th class="td-right">Ret Z</th><th class="td-right">Vol Z</th><th class="td-right">Composite</th></tr></thead>
+    <tbody>${rows.map(r=>sectorRow(r,highlight)).join('')}</tbody></table>`;
+}
+
+// ── Data loading ──────────────────────────────────────────────────────────────
+async function loadData(){
+  try{
+    const res=await fetch('data.json');
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    D=await res.json();
+    el('loading').style.display='none';
+    el('app').style.display='flex';
+    renderHeader();
+    renderTicker();
+    showTab('guide');
+    console.log('The Brief loaded —', D.meta.data_date);
+  } catch(e){
+    el('loading').innerHTML=`<div style="color:var(--red);font-family:'IBM Plex Mono',monospace;font-size:14px;text-align:center">
+      Failed to load data.json<br><span style="color:var(--text3);font-size:12px">${e.message}<br>Run: python generate.py</span></div>`;
+  }
+}
+
+// ── Header ────────────────────────────────────────────────────────────────────
+function renderHeader(){
+  el('hdr-date').textContent='Data: '+D.meta.data_date+'  ·  Generated: '+D.meta.generated_at.replace('T',' ').replace('Z','');
+}
+
+// ── Ticker bar ────────────────────────────────────────────────────────────────
+function renderTicker(){
+  const snap  = D.equities.index_snapshot || [];
+  const comms = (D.equities.commodities||{}).snapshot || [];
+  const items = [...snap, ...comms];
+  if(!items.length){ el('ticker-inner').textContent='—'; return; }
+
+  const html = items.map(t=>{
+    const chg=t['1D'];
+    return `<div class="tick-item">
+      <span class="tick-sym">${t.ticker}</span>
+      <span class="tick-price">${fmt(t.price,2)}</span>
+      <span class="tick-chg ${chg>=0?'up':'down'}">${sign(chg)}${fmt(Math.abs(chg),2)}%</span>
+    </div>`;
+  }).join('');
+  // duplicate for seamless loop
+  el('ticker-inner').innerHTML = html + html;
+}
+
+// ── Tab management ────────────────────────────────────────────────────────────
+function showTab(id){
+  document.querySelectorAll('.tab-panel').forEach(p=>p.style.display='none');
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  const panel=el('tab-'+id); if(panel) panel.style.display='block';
+  const btn=document.querySelector(`[data-tab="${id}"]`); if(btn) btn.classList.add('active');
+  if(!done[id]){
+    done[id]=true;
+    if(id==='equities')   renderEquities();
+    if(id==='fi')         renderFI();
+    if(id==='calendar')   renderCalendar();
+  }
+}
+document.addEventListener('DOMContentLoaded',()=>{
+  document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.tab)));
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// EQUITIES TAB
+// ══════════════════════════════════════════════════════════════════════════════
+function renderEquities(){
+  renderRegime();
+  renderIndices();
+  renderCommodities();
+  renderSectorTables();
+  render52Week();
+  renderPositioningFeed();
+  renderDrawdown();
+  renderCorrelation();
+  renderRelPerf();
+  renderFlowPrice();
+  renderSectorHeatmaps();
+  renderCandlestick();
+}
+
+// 2.1 Regime gauge
+function renderRegime(){
+  const mr=D.equities.market_regime; if(!mr){ noData('regime-gauge'); return; }
+  const s=mr.score, lbl=mr.label;
+  const gclr = s<=25?C.red:s<=45?C.orange:s<=55?C.text3:s<=75?C.accent2:'#26de81';
+
+  safePlot('regime-gauge',[{
+    type:'indicator', mode:'gauge+number',
+    value:s,
+    number:{font:{color:C.text,size:40},valueformat:'.1f'},
+    gauge:{
+      axis:{range:[0,100],tickcolor:C.text3,tickfont:{color:C.text3,size:10},
+            tickvals:[0,25,45,55,75,100],ticktext:['0','25','45','55','75','100']},
+      bar:{color:gclr,thickness:.28},
+      bgcolor:'rgba(0,0,0,0)',
+      borderwidth:0,
+      steps:[
+        {range:[0,25], color:'rgba(255,107,107,.12)'},
+        {range:[25,45],color:'rgba(255,159,67,.12)'},
+        {range:[45,55],color:'rgba(90,90,112,.12)'},
+        {range:[55,75],color:'rgba(78,205,196,.12)'},
+        {range:[75,100],color:'rgba(38,222,129,.12)'},
+      ],
+    }
+  }],{
+    paper_bgcolor:'rgba(0,0,0,0)', font:{family:'IBM Plex Mono',color:C.text2},
+    margin:{t:20,r:30,b:10,l:30}, height:240,
+  },CFG);
+
+  // Badge
+  el('regime-badge').innerHTML=`<span class="regime-badge" style="background:${gclr}22;color:${gclr};border:1px solid ${gclr}44">${lbl.toUpperCase()}</span>`;
+
+  // Component bars
+  const comp=mr.components;
+  const labels={'breadth':'Breadth (RSP/SPY)','cyc_def':'Cyc/Def Ratio',
+                'vol_z':'SPY Volume Z','macro_micro':'Macro/Micro','composite':'Sector Composite'};
+  const keys=Object.keys(comp);
+  safePlot('regime-bars',[{
+    type:'bar', orientation:'h',
+    x:keys.map(k=>comp[k]),
+    y:keys.map(k=>labels[k]||k),
+    marker:{color:keys.map(k=>{ const v=comp[k]; return v>=15?C.green:v>=10?C.accent:v>=5?C.orange:C.red; })},
+    text:keys.map(k=>fmt(comp[k],1)),
+    textposition:'outside',
+    cliponaxis:false,
+  }],pl({
+    margin:{t:20,r:50,b:30,l:160},
+    xaxis:{range:[0,22],showgrid:false,zeroline:false},
+    yaxis:{showgrid:false,automargin:true},
+    showlegend:false,
+    shapes:[{type:'line',x0:20,x1:20,y0:-.5,y1:keys.length-.5,
+             line:{color:C.border2,dash:'dot',width:1}}],
+  }),CFG);
+}
+
+// 2.2 Indices
+function renderIndices(period='6M'){
+  const ir=D.equities.index_returns; if(!ir){ noData('idx-chart'); return; }
+  const COLS={SPY:'#4d9de0',QQQ:'#ff9f43',IWM:'#4ecdc4',DIA:'#e15554'};
+  const traces=Object.entries(ir).map(([t,d])=>{
+    const {dates,values}=sliceRebase(d.dates,d.values,period);
+    return {type:'scatter',mode:'lines',name:t,x:dates,y:values,
+            line:{color:COLS[t]||C.text2,width:1.8},hovertemplate:`${t}: %{y:.2f}%<extra></extra>`};
+  });
+  safePlot('idx-chart',traces,pl({margin:{t:20,r:20,b:40,l:55},
+    yaxis:{ticksuffix:'%',zeroline:true,zerolinecolor:C.border2}}),CFG);
+
+  makeToggle('idx-toggle',['1M','3M','6M','YTD','1Y'],period,p=>renderIndices(p));
+}
+
+// 2.3 Commodities
+function renderCommodities(){
+  const comm=D.equities.commodities||{}; const snap=comm.snapshot||[];
+  const grid=el('commodity-cards'); if(!grid) return;
+  grid.innerHTML=snap.map(t=>`
+    <div class="stat-card">
+      <div class="stat-label">${t.name}</div>
+      <div class="stat-value" style="font-size:18px">${fmt(t.price,2)}</div>
+      <div class="stat-change">
+        <span class="stat-arrow ${clr(t['1D'])===C.green?'up':'down'}">${sign(t['1D'])}</span>
+        <span style="color:${clr(t['1D'])}">${fmtP(t['1D'])} 1D</span>
+        <span style="color:${C.text3}">·</span>
+        <span style="color:${clr(t['1M'])}">${fmtP(t['1M'])} 1M</span>
+      </div>
+      <div class="stat-meta">${t.ticker}</div>
+    </div>`).join('');
+
+  const ratio=comm.copper_gold_ratio||{};
+  if(ratio.dates&&ratio.dates.length){
+    safePlot('cg-ratio-chart',[{
+      type:'scatter',mode:'lines',x:ratio.dates,y:ratio.values,
+      name:'Cu/Au',line:{color:C.orange,width:1.5},
+      hovertemplate:'%{x}<br>Cu/Au: %{y:.4f}<extra></extra>',
+    }],pl({margin:{t:20,r:20,b:40,l:60},showlegend:false}),CFG);
+  } else noData('cg-ratio-chart','Copper/Gold ratio unavailable');
+}
+
+// 2.4 Sector tables
+function renderSectorTables(){
+  const sc=D.equities.sector_composites||[]; if(!sc.length) return;
+  el('top3-table').innerHTML=sectorTable(sc.slice(0,3));
+  el('bot3-table').innerHTML=sectorTable(sc.slice(-3).reverse());
+  el('sector-table').innerHTML=sectorTable(sc);
+}
+
+// 2.5 52-week
+function render52Week(){
+  const fw=D.equities.fiftytwo_week||[]; if(!fw.length){ noData('fiftytwo-chart'); return; }
+  const sorted=[...fw].sort((a,b)=>a.pct_of_range-b.pct_of_range);
+  const clrs=sorted.map(r=>r.pct_of_range>=70?C.green:r.pct_of_range<=30?C.red:C.accent);
+
+  safePlot('fiftytwo-chart',[{
+    type:'bar',orientation:'h',
+    y:sorted.map(r=>r.ticker),
+    x:sorted.map(r=>r.pct_of_range),
+    marker:{color:clrs},
+    customdata:sorted.map(r=>[r.pct_from_high,r.pct_from_low,r.low_52w,r.high_52w,r.current]),
+    hovertemplate:'<b>%{y}</b><br>Range position: %{x:.1f}%<br>From High: %{customdata[0]:.2f}%<br>From Low: %{customdata[1]:.2f}%<br>Low: $%{customdata[2]:.2f} · High: $%{customdata[3]:.2f} · Now: $%{customdata[4]:.2f}<extra></extra>',
+  }],pl({
+    margin:{t:20,r:30,b:40,l:55},
+    xaxis:{range:[0,105],title:'% of 52W Range (0=low, 100=high)',
+           ticksuffix:'%',showgrid:true},
+    yaxis:{showgrid:false,automargin:true},
+    showlegend:false,
+    shapes:[
+      {type:'line',x0:30,x1:30,y0:-.5,y1:sorted.length-.5,line:{color:C.red,dash:'dot',width:1}},
+      {type:'line',x0:70,x1:70,y0:-.5,y1:sorted.length-.5,line:{color:C.green,dash:'dot',width:1}},
+    ],
+  }),CFG);
+}
+
+// 2.6 Positioning feed
+function renderPositioningFeed(){
+  const eq=D.equities;
+
+  function linePlot(id,s,col,ytitle=''){
+    if(!s||!s.dates){ noData(id); return; }
+    safePlot(id,[{type:'scatter',mode:'lines',x:s.dates,y:s.values,line:{color:col,width:1.5},showlegend:false}],
+      pl({margin:{t:10,r:20,b:35,l:50},yaxis:{title:ytitle}}),CFG);
+  }
+  linePlot('mm-chart',  eq.macro_micro,       C.accent2,'Percentile');
+  linePlot('breadth-chart', eq.breadth,       C.orange, 'Ratio');
+  linePlot('cycdef-chart',  eq.cyclical_defensive, C.green, 'Ratio');
+
+  // SPY Volume Z as bar
+  const vz=eq.spy_volume_z;
+  if(vz&&vz.dates){
+    safePlot('volz-chart',[{
+      type:'bar',x:vz.dates,y:vz.values,
+      marker:{color:vz.values.map(v=>v>=0?C.green:C.red)},
+      showlegend:false,
+    }],pl({margin:{t:10,r:20,b:35,l:50},yaxis:{title:'Z-Score'}}),CFG);
+  } else noData('volz-chart');
+}
+
+// 2.7 Drawdown
+function renderDrawdown(period='1Y'){
+  const dd=D.equities.drawdown||{}; if(!Object.keys(dd).length){ noData('dd-chart'); return; }
+  const traces=SECTOR_ETFS.filter(t=>dd[t]).map((t,i)=>({
+    type:'scatter',mode:'lines',name:t,
+    ...slicePeriod(dd[t].dates,dd[t].values,period),
+    line:{color:C.sectors[i],width:1,opacity:.7},
+  }));
+  if(dd['SPY']){
+    const {dates,values}=slicePeriod(dd['SPY'].dates,dd['SPY'].values,period);
+    traces.unshift({type:'scatter',mode:'lines',name:'SPY',x:dates,y:values,
+                    line:{color:C.accent,width:2.5}});
+  }
+  safePlot('dd-chart',traces,pl({
+    yaxis:{ticksuffix:'%',zeroline:true,zerolinecolor:C.border2},
+    margin:{t:20,r:20,b:40,l:60},
+  }),CFG);
+  makeToggle('dd-toggle',['3M','6M','1Y','Full'],period,p=>renderDrawdown(p));
+}
+
+// 2.8 Correlation heatmap
+function renderCorrelation(){
+  const corr=D.equities.correlation; if(!corr||!corr.z||!corr.z.length){ noData('corr-chart'); return; }
+  safePlot('corr-chart',[{
+    type:'heatmap',
+    x:corr.x, y:corr.y, z:corr.z,
+    colorscale:'RdBu', reversescale:true, zmid:0,
+    zmin:-1,zmax:1,
+    text:corr.z.map(row=>row.map(v=>v!=null?v.toFixed(2):'')),
+    texttemplate:'%{text}',
+    textfont:{size:9,color:'#e8e8f0'},
+    colorbar:{tickfont:{color:C.text3,size:9},outlinewidth:0},
+    hovertemplate:'%{x} vs %{y}<br>ρ = %{z:.3f}<extra></extra>',
+  }],{
+    paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'#111118',
+    font:{family:'IBM Plex Mono',color:C.text2,size:10},
+    margin:{t:20,r:20,b:60,l:60},
+    xaxis:{side:'bottom',tickangle:-35},
+    yaxis:{autorange:'reversed'},
+  },CFG);
+}
+
+// 2.9 Relative performance
+function renderRelPerf(fPeriod='1Y', cPeriod='1Y', dPeriod='1Y'){
+  const fa=D.factors;
+  if(!fa){ ['frel-chart','falpha-chart','crel-chart','drel-chart'].forEach(id=>noData(id)); return; }
+
+  // Factor rel perf
+  function plotRelPerf(id, datesAll, seriesAll, cols, period){
+    const {dates,series}=sliceRatio(datesAll,seriesAll,period);
+    const traces=Object.entries(series).map(([t,vals])=>({
+      type:'scatter',mode:'lines',name:t,x:dates,y:vals,
+      line:{color:cols[t]||C.text2,width:1.5},
+      hovertemplate:`${t}: %{y:.3f}<extra></extra>`,
+    }));
+    safePlot(id,traces,pl({yaxis:{zeroline:false},margin:{t:20,r:20,b:40,l:55}}),CFG);
+  }
+
+  if(fa.factor_rel_perf&&fa.factor_rel_perf.dates){
+    plotRelPerf('frel-chart',fa.factor_rel_perf.dates,fa.factor_rel_perf.series,FCOLS,fPeriod);
+  }
+  makeToggle('frel-toggle',['3M','6M','1Y','Full'],fPeriod,p=>{ renderRelPerf(p,cPeriod,dPeriod); });
+
+  // Factor alpha
+  if(fa.factor_alpha&&fa.factor_alpha.dates){
+    const traces=Object.entries(fa.factor_alpha.series).map(([t,vals])=>({
+      type:'scatter',mode:'lines',name:t,x:fa.factor_alpha.dates,y:vals,
+      line:{color:FCOLS[t]||C.text2,width:1.5},
+    }));
+    safePlot('falpha-chart',traces,pl({
+      yaxis:{tickformat:'.1%',zeroline:true,zerolinecolor:C.border2},
+    }),CFG);
+  }
+
+  // Sector rel perf
+  const srp=fa.sector_rel_perf;
+  if(srp&&srp.cyclical&&srp.cyclical.dates){
+    plotRelPerf('crel-chart',srp.cyclical.dates,srp.cyclical.series,{},cPeriod);
+  }
+  makeToggle('crel-toggle',['3M','6M','1Y','Full'],cPeriod,p=>renderRelPerf(fPeriod,p,dPeriod));
+
+  if(srp&&srp.defensive&&srp.defensive.dates){
+    plotRelPerf('drel-chart',srp.defensive.dates,srp.defensive.series,{},dPeriod);
+  }
+  makeToggle('drel-toggle',['3M','6M','1Y','Full'],dPeriod,p=>renderRelPerf(fPeriod,cPeriod,p));
+}
+
+// 2.10 ETF Flow & Price
+function renderFlowPrice(){
+  const fp=D.factors.etf_flow_price||{};
+  const SECTOR=['XLK','XLF','XLE','XLV','XLI','XLU','XLP','XLY','XLB','XLRE','XLC'];
+  const FACTOR=['USMV','MTUM','VLUE','QUAL','HDV','SIZE'];
+
+  function buildGrid(containerId, tickers){
+    const g=el(containerId); if(!g) return;
+    g.innerHTML='';
+    tickers.filter(t=>fp[t]).forEach(t=>{
+      const div=document.createElement('div');
+      div.className='chart-box';
+      div.innerHTML=`<div class="chart-title" style="margin-bottom:8px">${t}</div><div id="fp-${t}" class="chart-body" style="height:200px"></div>`;
+      g.appendChild(div);
+      plotFlowPrice('fp-'+t, t, fp[t]);
+    });
+  }
+
+  buildGrid('fp-sector-grid', SECTOR);
+  buildGrid('fp-factor-grid', FACTOR);
+}
+
+function plotFlowPrice(id, ticker, data){
+  if(!data||!data.dates||!data.dates.length){ noData(id); return; }
+  const traces=[
+    {type:'scatter',mode:'lines',name:'Return %',x:data.dates,y:data.returns,
+     line:{color:C.accent2,width:1.5},yaxis:'y',
+     hovertemplate:'%{x}<br>Return: %{y:.2f}%<extra></extra>'},
+    {type:'bar',name:'Flow Z',x:data.dates,y:data.flow_z,
+     marker:{color:data.flow_z.map(v=>v!=null&&v>=0?C.green+'88':C.red+'88')},
+     yaxis:'y2',hovertemplate:'%{x}<br>Flow Z: %{y:.2f}<extra></extra>'},
+  ];
+  safePlot(id,traces,{
+    paper_bgcolor:'rgba(0,0,0,0)',plot_bgcolor:'#111118',
+    font:{family:'IBM Plex Mono',color:C.text2,size:9},
+    margin:{t:10,r:45,b:30,l:45},
+    xaxis:{gridcolor:C.border,showticklabels:true,nticks:4},
+    yaxis:{gridcolor:C.border,ticksuffix:'%',zeroline:true,zerolinecolor:C.border2,nticks:4},
+    yaxis2:{overlaying:'y',side:'right',showgrid:false,zeroline:true,
+            zerolinecolor:C.border2,nticks:4},
+    showlegend:false,barmode:'overlay',
+  },CFG);
+}
+
+// 2.11 Sector heatmaps
+function renderSectorHeatmaps(){
+  const sc=D.equities.sector_composites||[]; if(!sc.length) return;
+  const tickers=sc.map(r=>r.ticker);
+  const oneM=sc.map(r=>r['1M']);
+  const fiveD=sc.map(r=>r['5D']);
+
+  safePlot('ret-heatmap',[{
+    type:'heatmap',x:tickers,y:['1M Ret','5D Ret'],z:[oneM,fiveD],
+    colorscale:'RdYlGn',zmid:0,
+    text:[oneM.map(v=>fmt(v,1)+'%'),fiveD.map(v=>fmt(v,1)+'%')],
+    texttemplate:'%{text}',textfont:{size:9},
+    colorbar:{tickfont:{color:C.text3,size:9},outlinewidth:0},
+    hovertemplate:'%{x} %{y}: %{z:.2f}%<extra></extra>',
+  }],{
+    paper_bgcolor:'rgba(0,0,0,0)',plot_bgcolor:'#111118',
+    font:{family:'IBM Plex Mono',color:C.text2,size:10},
+    margin:{t:20,r:80,b:40,l:65},
+    xaxis:{side:'bottom'},yaxis:{autorange:'reversed'},
+  },CFG);
+
+  const sorted=[...sc].sort((a,b)=>b['1M']-a['1M']);
+  safePlot('ret-bar',[{
+    type:'bar',x:sorted.map(r=>r.ticker),y:sorted.map(r=>r['1M']),
+    marker:{color:sorted.map(r=>r['1M']>=0?C.green:C.red)},
+    hovertemplate:'%{x}: %{y:.2f}%<extra></extra>',
+  }],pl({
+    margin:{t:20,r:20,b:40,l:50},
+    yaxis:{ticksuffix:'%',zeroline:true,zerolinecolor:C.border2},
+    showlegend:false,
+  }),CFG);
+}
+
+// 2.12 Candlestick
+function renderCandlestick(period='6M'){
+  const ohlc=D.equities.spy_ohlcv;
+  if(!ohlc||!ohlc.dates){ noData('candle-chart','SPY OHLCV data unavailable'); return; }
+
+  const {dates}=slicePeriod(ohlc.dates,ohlc.dates,period);
+  const k=ohlc.dates.indexOf(dates[0]);
+  const sl=(arr)=>arr.slice(k);
+
+  const close=sl(ohlc.series.Close);
+  const n=20;
+  const ma20=close.map((_,i)=>{
+    if(i<n-1) return null;
+    return close.slice(i-n+1,i+1).filter(v=>v!=null).reduce((a,b)=>a+b,0)/n;
+  });
+
+  safePlot('candle-chart',[
+    {type:'candlestick',x:dates,
+     open:sl(ohlc.series.Open),high:sl(ohlc.series.High),
+     low:sl(ohlc.series.Low),close:close,
+     increasing:{line:{color:C.green},fillcolor:C.green+'33'},
+     decreasing:{line:{color:C.red}, fillcolor:C.red+'33'},
+     name:'SPY',showlegend:false,
+     hovertemplate:'%{x}<br>O:%{open:.2f} H:%{high:.2f} L:%{low:.2f} C:%{close:.2f}<extra></extra>'},
+    {type:'scatter',mode:'lines',x:dates,y:ma20,name:'20D MA',
+     line:{color:C.accent,width:1.5,dash:'dot'}},
+  ],pl({
+    margin:{t:20,r:20,b:40,l:60},
+    xaxis:{rangeslider:{visible:false}},
+    showlegend:true,
+  }),CFG);
+  makeToggle('candle-toggle',['3M','6M','1Y'],period,p=>renderCandlestick(p));
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// FIXED INCOME TAB
+// ══════════════════════════════════════════════════════════════════════════════
+function renderFI(){
+  renderKeyRates();
+  renderYieldCurve();
+  renderSpreadsChart();
+  renderRealYield();
+  renderCreditSpreads();
+  renderInflationDecomp();
+  renderMacroCharts();
+}
+
+// 3.1 Key rates
+function renderKeyRates(){
+  const krs=D.fixed_income.key_rates_snapshot||[]; if(!krs.length) return;
+  const grid=el('key-rates-cards');
+  grid.innerHTML=krs.map(r=>`
+    <div class="stat-card">
+      <div class="stat-label">${r.label}</div>
+      <div class="stat-value">${fmt(r.value,2)}${r.suffix||''}</div>
+      <div class="stat-change">
+        <span style="color:${r.direction==='up'?C.green:r.direction==='down'?C.red:C.text3}">${
+          r.direction==='up'?'↑':r.direction==='down'?'↓':'→'
+        } ${fmtP(r.change,3)}</span>
+      </div>
+    </div>`).join('');
+
+  const snap=D.fixed_income.yield_curve_snapshot||{};
+  el('curve-summary').textContent=snap.summary||'Yield curve data unavailable.';
+}
+
+// 3.2 Yield Curve
+function renderYieldCurve(period='Full'){
+  const snap=D.fixed_income.yield_curve_snapshot||{};
+  const hist=D.fixed_income.treasury_yields_history;
+
+  // Spot rates
+  if(snap.tenors&&snap.rates){
+    safePlot('yc-spot',[
+      {type:'scatter',mode:'lines+markers',
+       x:snap.tenors,y:snap.tenors.map(t=>snap.rates[t]),
+       line:{color:C.accent,width:2},marker:{size:7,color:C.accent},
+       name:'Spot',hovertemplate:'%{x}: %{y:.3f}%<extra></extra>'},
+    ],pl({
+      margin:{t:20,r:20,b:40,l:55},
+      yaxis:{ticksuffix:'%'},showlegend:false,
+    }),CFG);
+  }
+
+  // History
+  if(hist&&hist.dates&&hist.series){
+    const COLS={  '2Y':'#4d9de0','5Y':'#ff9f43','10Y':'#4ecdc4','30Y':'#e8c97a'};
+    const {dates}=slicePeriod(hist.dates,hist.dates,period);
+    const k=hist.dates.indexOf(dates[0]);
+    const traces=Object.entries(hist.series).map(([t,vals])=>({
+      type:'scatter',mode:'lines',name:t,x:dates,y:vals.slice(k),
+      line:{color:COLS[t]||C.text2,width:1.5},
+      hovertemplate:`${t}: %{y:.3f}%<extra></extra>`,
+    }));
+    safePlot('yc-hist',traces,pl({yaxis:{ticksuffix:'%'}}),CFG);
+  }
+  makeToggle('yh-toggle',['1Y','3Y','5Y','10Y','Full'],period,p=>renderYieldCurve(p));
+}
+
+// 3.3 Spreads
+function renderSpreadsChart(period='Full'){
+  const cs=D.fixed_income.curve_spreads;
+  if(!cs||!cs.data||!cs.data.dates){ noData('spreads-chart'); return; }
+  const d=cs.data;
+  const s2=d.series['10Y-2Y'], s3=d.series['10Y-3M'];
+  const {dates}=slicePeriod(d.dates,d.dates,period);
+  const k=d.dates.indexOf(dates[0]);
+  const traces=[
+    s2&&{type:'scatter',mode:'lines',name:'10Y-2Y',x:dates,y:s2.slice(k),line:{color:'#4d9de0',width:1.5}},
+    s3&&{type:'scatter',mode:'lines',name:'10Y-3M',x:dates,y:s3.slice(k),line:{color:'#e15554',width:1.5}},
+  ].filter(Boolean);
+  safePlot('spreads-chart',traces,pl({
+    yaxis:{ticksuffix:'%',zeroline:true,zerolinecolor:C.red,zerolinewidth:1.5},
+    shapes:[{type:'line',x0:dates[0],x1:dates[dates.length-1],y0:0,y1:0,
+             line:{color:C.red,dash:'dash',width:1}}],
+  }),CFG);
+  makeToggle('cs-toggle',['1Y','3Y','5Y','10Y','Full'],period,p=>renderSpreadsChart(p));
+}
+
+// 3.4 Real yield & breakeven
+function renderRealYield(){
+  const ry=D.fixed_income.real_yield_breakeven;
+  if(!ry||!ry.data||!ry.data.dates||!ry.data.dates.length){ noData('ry-chart','Real yield data unavailable — DFII10 may be down'); return; }
+  const d=ry.data;
+  const COLS={'Real Yield 10Y':'#4d9de0','Breakeven 10Y':'#e15554'};
+  const traces=Object.entries(d.series).map(([name,vals])=>({
+    type:'scatter',mode:'lines',name,x:d.dates,y:vals,
+    line:{color:COLS[name]||C.text2,width:1.5},
+  }));
+  safePlot('ry-chart',traces,pl({yaxis:{ticksuffix:'%'}}),CFG);
+}
+
+// 3.5 Credit spreads
+function renderCreditSpreads(){
+  const cs=D.fixed_income.credit_spreads;
+  if(!cs||!cs.data||!cs.data.dates){ noData('credit-chart'); return; }
+  const d=cs.data;
+  const COLS={'HY OAS':'#4d9de0','IG OAS':'#e15554','HY-IG Gap':'#4ecdc4'};
+  const traces=Object.entries(d.series).map(([name,vals])=>({
+    type:'scatter',mode:'lines',name,x:d.dates,y:vals,
+    line:{color:COLS[name]||C.text2,width:1.5,dash:name.includes('Gap')?'dot':'solid'},
+  }));
+  safePlot('credit-chart',traces,pl({yaxis:{ticksuffix:'%',title:'OAS (bps / 100)'}}),CFG);
+}
+
+// 3.6 Inflation decomp
+function renderInflationDecomp(){
+  const id=D.fixed_income.inflation_decomp;
+  if(!id||!id.data||!id.data.dates||!id.data.dates.length){
+    noData('infl-decomp','CPI component data unavailable — re-run generate.py after FRED restores series');
+    return;
+  }
+  const d=id.data;
+  const COLS={'Shelter':'#4d9de0','Energy':'#e15554','Food at Home':'#ff9f43',
+              'Core Goods':'#4ecdc4','Services':'#ab87ff'};
+  const traces=Object.entries(d.series).map(([name,vals])=>({
+    type:'scatter',mode:'lines',name,x:d.dates,y:vals,
+    line:{color:COLS[name]||C.text2,width:1.5},
+    hovertemplate:`${name}: %{y:.2f}%<extra></extra>`,
+  }));
+  // Add 2% target line
+  traces.push({type:'scatter',mode:'lines',name:'2% Target',
+    x:[d.dates[0],d.dates[d.dates.length-1]],y:[2,2],
+    line:{color:C.red,dash:'dash',width:1},showlegend:true});
+  safePlot('infl-decomp',traces,pl({yaxis:{ticksuffix:'%',title:'YoY %',zeroline:true}}),CFG);
+}
+
+// 3.7 Macro charts
+function renderMacroCharts(){
+  const fi=D.fixed_income;
+
+  // CPI
+  const cpi=fi.inflation_series;
+  if(cpi&&cpi.data&&cpi.data.dates){
+    const d=cpi.data;
+    const traces=Object.entries(d.series)
+      .filter(([n])=>n.includes('CPI'))
+      .map(([name,vals],i)=>({
+        type:'scatter',mode:'lines',name,x:d.dates,y:vals,
+        line:{color:i===0?'#4d9de0':'#ff9f43',width:1.5}}));
+    traces.push({type:'scatter',mode:'lines',name:'2% Target',
+      x:[d.dates[0],d.dates[d.dates.length-1]],y:[2,2],
+      line:{color:C.red,dash:'dash',width:1}});
+    safePlot('cpi-chart',traces,pl({yaxis:{ticksuffix:'%'},margin:{t:20,r:20,b:40,l:50}}),CFG);
+  } else noData('cpi-chart');
+
+  // PCE
+  if(cpi&&cpi.data&&cpi.data.dates){
+    const d=cpi.data;
+    const traces=Object.entries(d.series)
+      .filter(([n])=>n.includes('PCE'))
+      .map(([name,vals],i)=>({
+        type:'scatter',mode:'lines',name,x:d.dates,y:vals,
+        line:{color:i===0?'#4ecdc4':'#e8c97a',width:1.5}}));
+    traces.push({type:'scatter',mode:'lines',name:'2% Target',
+      x:[d.dates[0],d.dates[d.dates.length-1]],y:[2,2],
+      line:{color:C.red,dash:'dash',width:1}});
+    safePlot('pce-chart',traces,pl({yaxis:{ticksuffix:'%'},margin:{t:20,r:20,b:40,l:50}}),CFG);
+  } else noData('pce-chart');
+
+  // Fed Funds & Unemployment
+  const fl=fi.fed_and_labor;
+  if(fl&&fl.data&&fl.data.dates){
+    const d=fl.data;
+    const traces=Object.entries(d.series).map(([name,vals],i)=>({
+      type:'scatter',mode:'lines',name,x:d.dates,y:vals,
+      line:{color:i===0?C.accent:'#4d9de0',width:1.5},
+    }));
+    safePlot('fedfunds-chart',traces,pl({yaxis:{ticksuffix:'%'},margin:{t:20,r:20,b:40,l:50}}),CFG);
+  } else noData('fedfunds-chart');
+
+  // GDP
+  const gdp=fi.gdp_growth;
+  if(gdp&&gdp.dates&&gdp.dates.length){
+    safePlot('gdp-chart',[{
+      type:'bar',x:gdp.dates,y:gdp.values,
+      marker:{color:gdp.colors.map(c=>c==='green'?C.green:C.red)},
+      hovertemplate:'%{x}<br>QoQ Ann: %{y:.2f}%<extra></extra>',
+    }],pl({
+      yaxis:{ticksuffix:'%',zeroline:true,zerolinecolor:C.border2},
+      margin:{t:20,r:20,b:40,l:50},showlegend:false,
+    }),CFG);
+  } else noData('gdp-chart');
+
+  // Macro pulse
+  const mp=fi.macro_pulse;
+  if(mp&&mp.dates&&mp.dates.length){
+    safePlot('pulse-chart',[
+      {type:'scatter',mode:'lines',name:'10Y-2Y Spread',x:mp.dates,y:mp.spread_10y2y,
+       line:{color:'#4d9de0',width:1.5}},
+      {type:'scatter',mode:'lines',name:'Fed Funds',x:mp.dates,y:mp.fed_funds,
+       line:{color:C.accent,width:1.5}},
+      {type:'scatter',mode:'lines',name:'Unemployment',x:mp.dates,y:mp.unemployment,
+       line:{color:'#e15554',width:1.5}},
+    ],pl({yaxis:{ticksuffix:'%'},margin:{t:20,r:20,b:40,l:55}}),CFG);
+  } else noData('pulse-chart');
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CALENDAR TAB
+// ══════════════════════════════════════════════════════════════════════════════
+function renderCalendar(){
+  renderReleasesTable();
+  renderReleaseCalendar();
+  renderFOMC();
+}
+
+function renderReleasesTable(){
+  const krs=D.fixed_income.key_rates_snapshot||[];
+  const infl=D.fixed_income.inflation_series;
+  const gdp=D.fixed_income.gdp_growth;
+  const fi=D.fixed_income;
+
+  const releases=[
+    {name:'10Y Treasury',val:krs.find(r=>r.label==='10Y Treasury'),unit:'%'},
+    {name:'2Y Treasury',val:krs.find(r=>r.label==='2Y Treasury'),unit:'%'},
+    {name:'Fed Funds Rate',val:krs.find(r=>r.label==='Fed Funds Rate'),unit:'%'},
+    {name:'CPI YoY',val:krs.find(r=>r.label==='CPI YoY'),unit:'%'},
+    {name:'10Y-2Y Spread',val:krs.find(r=>r.label==='10Y-2Y Spread'),unit:'%'},
+  ];
+
+  const rows=releases.map(r=>{
+    const v=r.val;
+    if(!v) return '';
+    const isUp=v.direction==='up', isDown=v.direction==='down';
+    return `<tr>
+      <td>${r.name}</td>
+      <td class="td-right" style="font-family:'IBM Plex Mono',monospace">${fmt(v.value,3)}${r.unit}</td>
+      <td class="td-right" style="font-family:'IBM Plex Mono',monospace;color:${isUp?C.green:isDown?C.red:C.text3}">${
+        (v.change>=0?'+':'')+fmt(v.change,3)}</td>
+      <td class="td-center" style="color:${isUp?C.green:isDown?C.red:C.text3}">${
+        isUp?'↑':isDown?'↓':'→'}</td>
+    </tr>`;
+  }).filter(Boolean);
+
+  el('releases-table').innerHTML=`<table class="data-table">
+    <thead><tr><th>Metric</th><th class="td-right">Latest</th><th class="td-right">Change</th><th class="td-center">Dir</th></tr></thead>
+    <tbody>${rows.join('')}</tbody></table>`;
+}
+
+const RELEASE_CALENDAR=[
+  {date:'2026-04-10',name:'CPI (Mar 2026)',type:'inflation'},
+  {date:'2026-04-11',name:'PPI (Mar 2026)',type:'inflation'},
+  {date:'2026-04-14',name:'Retail Sales (Mar 2026)',type:'growth'},
+  {date:'2026-04-23',name:'GDP Q1 2026 Advance',type:'growth'},
+  {date:'2026-04-30',name:'PCE (Mar 2026)',type:'inflation'},
+  {date:'2026-05-01',name:'Jobs Report (Apr 2026)',type:'labor'},
+  {date:'2026-05-07',name:'CPI (Apr 2026)',type:'inflation'},
+  {date:'2026-05-14',name:'Retail Sales (Apr 2026)',type:'growth'},
+  {date:'2026-05-15',name:'Industrial Production (Apr 2026)',type:'growth'},
+  {date:'2026-05-28',name:'PCE (Apr 2026)',type:'inflation'},
+  {date:'2026-05-29',name:'GDP Q1 2026 Second Estimate',type:'growth'},
+  {date:'2026-06-04',name:'Jobs Report (May 2026)',type:'labor'},
+  {date:'2026-06-11',name:'CPI (May 2026)',type:'inflation'},
+  {date:'2026-06-16',name:'Retail Sales (May 2026)',type:'growth'},
+  {date:'2026-06-16',name:'FOMC Meeting Begins',type:'fomc'},
+  {date:'2026-06-17',name:'FOMC Rate Decision',type:'fomc'},
+  {date:'2026-06-25',name:'PCE (May 2026)',type:'inflation'},
+  {date:'2026-06-26',name:'GDP Q1 2026 Final',type:'growth'},
+  {date:'2026-06-29',name:'Jobs Report (Jun 2026)',type:'labor'},
+];
+
+function renderReleaseCalendar(){
+  const today='2026-05-15';
+  const past35=new Date(today); past35.setDate(past35.getDate()-35);
+  const future45=new Date(today); future45.setDate(future45.getDate()+45);
+  const p35=past35.toISOString().slice(0,10);
+  const f45=future45.toISOString().slice(0,10);
+
+  const visible=RELEASE_CALENDAR.filter(r=>r.date>=p35&&r.date<=f45);
+  const html=visible.map(r=>{
+    const isToday=r.date===today, isPast=r.date<today;
+    const badge=`<span class="rel-badge badge-${r.type}">${r.type}</span>`;
+    return `<div class="rel-row ${isToday?'rel-today':''} ${isPast&&!isToday?'rel-past':''}">
+      <div class="rel-date">${r.date}</div>
+      <div class="rel-name">${r.name}</div>
+      ${badge}${isToday?'<span style="color:var(--accent);font-size:11px;font-family:\'IBM Plex Mono\',monospace;margin-left:8px">← TODAY</span>':''}
+    </div>`;
+  }).join('');
+  el('release-calendar').innerHTML=html||'<div class="no-data">No releases in window</div>';
+}
+
+const FOMC_MEETINGS=[
+  {date:'2025-01-29',year:2025,outcome:'HOLD — 4.25–4.50%',past:true},
+  {date:'2025-03-19',year:2025,outcome:'HOLD — 4.25–4.50%',past:true},
+  {date:'2025-05-07',year:2025,outcome:'HOLD — 4.25–4.50%',past:true},
+  {date:'2025-06-18',year:2025,outcome:'HOLD — 4.25–4.50%',past:true},
+  {date:'2025-07-30',year:2025,outcome:'HOLD — 4.25–4.50%',past:true},
+  {date:'2025-09-17',year:2025,outcome:'HOLD — 4.25–4.50%',past:true},
+  {date:'2025-10-29',year:2025,outcome:'HOLD — 4.25–4.50%',past:true},
+  {date:'2025-12-10',year:2025,outcome:'HOLD — 4.25–4.50%',past:true},
+  {date:'2026-01-28',year:2026,outcome:'HOLD — 4.25–4.50%',past:true},
+  {date:'2026-03-18',year:2026,outcome:'HOLD — 4.25–4.50%',past:true},
+  {date:'2026-04-29',year:2026,outcome:'HOLD — 4.25–4.50%',past:true},
+  {date:'2026-06-17',year:2026,outcome:null,past:false},
+  {date:'2026-07-29',year:2026,outcome:null,past:false},
+  {date:'2026-09-16',year:2026,outcome:null,past:false},
+  {date:'2026-10-28',year:2026,outcome:null,past:false},
+  {date:'2026-12-09',year:2026,outcome:null,past:false},
+];
+
+function renderFOMC(){
+  const today=new Date('2026-05-15');
+  const years=[...new Set(FOMC_MEETINGS.map(m=>m.year))];
+  let html='';
+  years.forEach(yr=>{
+    html+=`<div class="fomc-year">${yr}</div>`;
+    FOMC_MEETINGS.filter(m=>m.year===yr).forEach(m=>{
+      const dtDiff=Math.round((new Date(m.date)-today)/(1000*60*60*24));
+      html+=`<div class="fomc-item ${m.past?'fomc-past':'fomc-future'}">
+        <div class="fomc-dot"></div>
+        <div class="fomc-date">${m.date}</div>
+        <div class="fomc-outcome">
+          ${m.past?`<span class="fomc-check">✓</span>`:''}`+
+          (m.past?m.outcome:'Pending')+
+        `</div>
+        ${!m.past?`<div class="fomc-days">in ${dtDiff}d</div>`:''}
+      </div>`;
+    });
+  });
+  el('fomc-list').innerHTML=html;
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', loadData);
+</script>
+</body>
+</html>

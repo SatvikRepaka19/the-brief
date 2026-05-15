@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python generate.py)",
+      "Bash(python -c ' *)",
+      "Bash(python \"C:\\\\Users\\\\satvi\\\\Claude Code - The Brief\\\\generate.py\")",
+      "mcp__Claude_in_Chrome__tabs_context_mcp"
+    ]
+  }
+}
